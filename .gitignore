@@ -99,6 +99,5 @@ node_modules
 #Custom
 venv
 .idea
-chains
 setup/RC_2015-01.csv
 setup/database.sqlite
