@@ -3,37 +3,35 @@ import Vue from 'vue'
 import clone from 'clone'
 import copy from 'shallow-copy';
 
+const containerEl = document.getElementById('chart');
 const outerDimensions = {
-    width: 1000,
-    height: 1000
+    width: containerEl.clientWidth,
+    height: containerEl.clientWidth
 };
 const margins = {
-    x: 100,
-    y: 100
+    x: 0,
+    y: 50
 };
 const dimensions = {
     width: outerDimensions.width - (2 * margins.x),
     height: outerDimensions.height - (2 * margins.y)
 };
-
-const LINK_WIDTH = 5;
-const DEFAULT_NODES = {
-    name: "___BEGIN__",
-    children: [{
-        name: "___BEGIN__",
-        state: 'open',
-        weight: 1
-    }],
-    x0: dimensions.height / 2,
+const DEFAULT_ROOT = {
+    name: "<Start>",
+    children: [],
+    x0: dimensions.width / 2,
     y0: 0,
     state: 'open'
 };
+const RECT_SIZE = {
+    width: 50,
+    height: 20
+};
 const duration = 750;
-const DEFAULT_STATE = [0, 1]; //By default the current state is the first two nodes: ___BEGIN__
 
 const diagonal = d3.svg.diagonal()
     .projection(function (d) {
-        return [d.y, d.x];
+        return [d.x, d.y];
     });
 
 let tree = d3.layout.tree()
@@ -58,17 +56,12 @@ outerSvg.append("defs").html(`
 const vm = new Vue({
     el: '#main',
     data: {
-        currentSubreddit: 'AskReddit',
+        currentSubreddit: null,//'pics',
         subreddits: [],
-        root: copy(DEFAULT_NODES),
+        root: copy(DEFAULT_ROOT),
         //links: copy(DEFAULT_LINKS),
         state: [],
         nextNodeId: 0
-    },
-    computed: {
-        secondRoot(){
-            return this.root.children[0];
-        }
     },
     methods: {
         clickNode(d) {
@@ -92,38 +85,44 @@ const vm = new Vue({
             var links = tree.links(nodes);
 
             // Normalize for fixed-depth.
-            //nodes.forEach(function (d) {
-            //    d.y = d.depth * 90;
-            //});
+            nodes.forEach(function (d) {
+                d.y = d.depth * 90;
+            });
 
             // Update the nodes…
             var node = svg.selectAll("g.node")
-                .data(nodes, d => {
-                    return d.id || (d.id = this.nextNodeId++);
-                });
-
-            node.style("fill", d => {
-                switch (d.state) {
-                    case "open":
-                        return "white";
-                    case "closed":
-                        return "black";
-                    case "loading":
-                        return "url(#loader)";
-
-                }
-            });
+                .data(nodes);
 
             // Enter any new nodes at the parent's previous position.
-            var nodeEnter = node.enter().append("g")
+            var nodeEnter = node
+                .enter()
+                .append("g")
                 .attr("class", "node")
                 .attr("transform", d => {
-                    return "translate(" + source.y0 + "," + source.x0 + ")";
+                    return "translate(" + source.x0 + "," + source.y0 + ")";
                 })
                 .on("click", this.clickNode);
 
-            nodeEnter.append("circle")
-                .attr("r", 1e-6)
+            nodeEnter
+                .append("rect")
+                .style('fill', 'white')
+                .style("stroke", d => {
+                    switch (d.state) {
+                        case "open":
+                            return "white";
+                        case "closed":
+                            return "black";
+                        case "loading":
+                            return "url(#loader)";
+
+                    }
+                })
+                //Move the rectangle into the centre of the node
+                .attr("transform", d => {
+                    return `translate(${-RECT_SIZE.width / 2}, ${-RECT_SIZE.height / 2})`;
+                })
+                .attr("width", RECT_SIZE.width)
+                .attr("height", RECT_SIZE.height);
             //.style("fill", function (d) {
             //    return d._children ? "white" : "#fff";
             //});
@@ -136,22 +135,24 @@ const vm = new Vue({
                 .attr("text-anchor", function (d) {
                     return d.children || d._children ? "end" : "start";
                 })
+                //.style('fill', 'white')
+                .style("fill-opacity", 1e-6)
+                .style('text-anchor', 'middle')
                 .text(function (d) {
                     let weight = d.weight ? ` (${d.weight})` : "";
-                    return `${d.name}${weight}`;
-                })
-                .style('fill', 'white')
-                .style("fill-opacity", 1e-6);
-
-            // Transition nodes to their new position.
-            var nodeUpdate = node.transition()
-                .duration(duration)
-                .attr("transform", function (d) {
-                    return "translate(" + d.y + "," + d.x + ")";
+                    return d.name;
                 });
 
-            nodeUpdate.select("circle")
-                .attr("r", 4.5)
+            // Transition nodes to their new position.
+            var nodeUpdate = node
+                .transition()
+                .duration(duration)
+                .attr("transform", function (d) {
+                    return "translate(" + d.x + "," + d.y + ")";
+                });
+
+            //nodeUpdate.select("circle")
+            //    .attr("r", 4.5)
             //.style("fill", function (d) {
             //    return d._children ? "lightsteelblue" : "#fff";
             //});
@@ -160,14 +161,17 @@ const vm = new Vue({
                 .style("fill-opacity", 1);
 
             // Transition exiting nodes to the parent's new position.
-            var nodeExit = node.exit().transition()
+            var nodeExit = node
+                .exit()
+                .transition()
                 .duration(duration)
                 .attr("transform", function (d) {
-                    return "translate(" + source.y + "," + source.x + ")";
+                    return "translate(" + source.x + "," + source.y + ")";
                 })
                 .remove();
 
-            nodeExit.select("circle")
+            nodeExit
+                .select("circle")
                 .attr("r", 1e-6);
 
             nodeExit.select("text")
@@ -214,7 +218,9 @@ const vm = new Vue({
             //    .text(d => d.target.weight);
 
             // Transition links to their new position.
-            linkLine.transition()
+            link
+                .selectAll('path')
+                .transition()
                 .duration(duration)
                 .attr("d", diagonal);
 
@@ -239,37 +245,42 @@ const vm = new Vue({
         fetchData(node){
             node.state = 'loading';
             this.render(node);
-            const sub = this.currentSubreddit;
-            const s1 = node.parent.name;
-            const s2 = node.name;
-            d3.json(`/api/markov?sub=${sub}&s1=${s1}&s2=${s2}`, (error, json) => {
+            d3.json(`/api/markov?node=${node.id}`, (error, json) => {
 
                 //Process the data
-                let result = json.top_ten;
-                result.forEach(node => {
+                let totalWeight = 0;
+                json.forEach(node => {
+                    totalWeight += node.weight;
                     node.state = 'closed';
                 });
 
                 //Update the parent node
-                node.totalWeight = result.reduce((prev, curr) => prev + curr.weight, 0);
+                node.totalWeight = totalWeight;
                 node.state = 'open';
-                node.children = result;
+                node.children = json;
 
                 //Rerender
                 this.render(this.root);
             });
         },
         loadInitial(){
-            this.fetchData(this.secondRoot);
+            const sub = this.currentSubreddit;
+            d3.json(`/api/initial?sub=${sub}&s1=___BEGIN__&s2=___BEGIN__`, (error, json) => {
+                this.root.id = json.id;
+            });
+            //this.fetchData(this.secondRoot);
         }
     },
     ready(){
 
         this.state.push(this.root, this.root.children[0]);
+        ;
 
         //On load, get the list of subreddits
         d3.json("/api/subreddits", (error, json) => {
             this.subreddits = json;
+            this.currentSubreddit = json[0].id;
+            this.loadInitial();
         });
 
         this.render(this.root);
@@ -281,7 +292,7 @@ const vm = new Vue({
         },
         //Whenever the current subreddit changes, download new data
         currentSubreddit(){
-            this.secondRoot.children = [];
+            this.root.children = [];
             this.loadInitial();
             this.render(this.root);
         },

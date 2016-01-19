@@ -1,0 +1,1 @@
+First run markov.py to generate json files, then to_csv.py to convert them to csv, then run load.py to load the subreddit names, then run the SQL script to load that into the database

@@ -64,36 +64,34 @@
 	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
+	var containerEl = document.getElementById('chart');
 	var outerDimensions = {
-	    width: 1000,
-	    height: 1000
+	    width: containerEl.clientWidth,
+	    height: containerEl.clientWidth
 	};
 	var margins = {
-	    x: 100,
-	    y: 100
+	    x: 0,
+	    y: 50
 	};
 	var dimensions = {
 	    width: outerDimensions.width - 2 * margins.x,
 	    height: outerDimensions.height - 2 * margins.y
 	};
-	
-	var LINK_WIDTH = 5;
-	var DEFAULT_NODES = {
-	    name: "___BEGIN__",
-	    children: [{
-	        name: "___BEGIN__",
-	        state: 'open',
-	        weight: 1
-	    }],
-	    x0: dimensions.height / 2,
+	var DEFAULT_ROOT = {
+	    name: "<Start>",
+	    children: [],
+	    x0: dimensions.width / 2,
 	    y0: 0,
 	    state: 'open'
 	};
+	var RECT_SIZE = {
+	    width: 50,
+	    height: 20
+	};
 	var duration = 750;
-	var DEFAULT_STATE = [0, 1]; //By default the current state is the first two nodes: ___BEGIN__
 	
 	var diagonal = _d2.default.svg.diagonal().projection(function (d) {
-	    return [d.y, d.x];
+	    return [d.x, d.y];
 	});
 	
 	var tree = _d2.default.layout.tree().size([dimensions.width - 2 * margins.x, dimensions.height - 2 * margins.y]).separation(function (a, b) {
@@ -109,17 +107,12 @@
 	var vm = new _vue2.default({
 	    el: '#main',
 	    data: {
-	        currentSubreddit: 'AskReddit',
+	        currentSubreddit: null, //'pics',
 	        subreddits: [],
-	        root: (0, _shallowCopy2.default)(DEFAULT_NODES),
+	        root: (0, _shallowCopy2.default)(DEFAULT_ROOT),
 	        //links: copy(DEFAULT_LINKS),
 	        state: [],
 	        nextNodeId: 0
-	    },
-	    computed: {
-	        secondRoot: function secondRoot() {
-	            return this.root.children[0];
-	        }
 	    },
 	    methods: {
 	        clickNode: function clickNode(d) {
@@ -137,22 +130,24 @@
 	            }
 	        },
 	        render: function render(source) {
-	            var _this = this;
 	
 	            var nodes = tree.nodes(this.root).reverse();
 	            var links = tree.links(nodes);
 	
 	            // Normalize for fixed-depth.
-	            //nodes.forEach(function (d) {
-	            //    d.y = d.depth * 90;
-	            //});
-	
-	            // Update the nodes…
-	            var node = svg.selectAll("g.node").data(nodes, function (d) {
-	                return d.id || (d.id = _this.nextNodeId++);
+	            nodes.forEach(function (d) {
+	                d.y = d.depth * 90;
 	            });
 	
-	            node.style("fill", function (d) {
+	            // Update the nodes…
+	            var node = svg.selectAll("g.node").data(nodes);
+	
+	            // Enter any new nodes at the parent's previous position.
+	            var nodeEnter = node.enter().append("g").attr("class", "node").attr("transform", function (d) {
+	                return "translate(" + source.x0 + "," + source.y0 + ")";
+	            }).on("click", this.clickNode);
+	
+	            nodeEnter.append("rect").style('fill', 'white').style("stroke", function (d) {
 	                switch (d.state) {
 	                    case "open":
 	                        return "white";
@@ -162,14 +157,11 @@
 	                        return "url(#loader)";
 	
 	                }
-	            });
-	
-	            // Enter any new nodes at the parent's previous position.
-	            var nodeEnter = node.enter().append("g").attr("class", "node").attr("transform", function (d) {
-	                return "translate(" + source.y0 + "," + source.x0 + ")";
-	            }).on("click", this.clickNode);
-	
-	            nodeEnter.append("circle").attr("r", 1e-6);
+	            })
+	            //Move the rectangle into the centre of the node
+	            .attr("transform", function (d) {
+	                return 'translate(' + -RECT_SIZE.width / 2 + ', ' + -RECT_SIZE.height / 2 + ')';
+	            }).attr("width", RECT_SIZE.width).attr("height", RECT_SIZE.height);
 	            //.style("fill", function (d) {
 	            //    return d._children ? "white" : "#fff";
 	            //});
@@ -178,17 +170,20 @@
 	                return d.children || d._children ? -10 : 10;
 	            }).attr("dy", ".35em").attr("text-anchor", function (d) {
 	                return d.children || d._children ? "end" : "start";
-	            }).text(function (d) {
+	            })
+	            //.style('fill', 'white')
+	            .style("fill-opacity", 1e-6).style('text-anchor', 'middle').text(function (d) {
 	                var weight = d.weight ? ' (' + d.weight + ')' : "";
-	                return '' + d.name + weight;
-	            }).style('fill', 'white').style("fill-opacity", 1e-6);
+	                return d.name;
+	            });
 	
 	            // Transition nodes to their new position.
 	            var nodeUpdate = node.transition().duration(duration).attr("transform", function (d) {
-	                return "translate(" + d.y + "," + d.x + ")";
+	                return "translate(" + d.x + "," + d.y + ")";
 	            });
 	
-	            nodeUpdate.select("circle").attr("r", 4.5);
+	            //nodeUpdate.select("circle")
+	            //    .attr("r", 4.5)
 	            //.style("fill", function (d) {
 	            //    return d._children ? "lightsteelblue" : "#fff";
 	            //});
@@ -197,7 +192,7 @@
 	
 	            // Transition exiting nodes to the parent's new position.
 	            var nodeExit = node.exit().transition().duration(duration).attr("transform", function (d) {
-	                return "translate(" + source.y + "," + source.x + ")";
+	                return "translate(" + source.x + "," + source.y + ")";
 	            }).remove();
 	
 	            nodeExit.select("circle").attr("r", 1e-6);
@@ -238,7 +233,7 @@
 	            //    .text(d => d.target.weight);
 	
 	            // Transition links to their new position.
-	            linkLine.transition().duration(duration).attr("d", diagonal);
+	            link.selectAll('path').transition().duration(duration).attr("d", diagonal);
 	
 	            link.exit().remove();
 	
@@ -258,44 +253,49 @@
 	            });
 	        },
 	        fetchData: function fetchData(node) {
-	            var _this2 = this;
+	            var _this = this;
 	
 	            node.state = 'loading';
 	            this.render(node);
-	            var sub = this.currentSubreddit;
-	            var s1 = node.parent.name;
-	            var s2 = node.name;
-	            _d2.default.json('/api/markov?sub=' + sub + '&s1=' + s1 + '&s2=' + s2, function (error, json) {
+	            _d2.default.json('/api/markov?node=' + node.id, function (error, json) {
 	
 	                //Process the data
-	                var result = json.top_ten;
-	                result.forEach(function (node) {
+	                var totalWeight = 0;
+	                json.forEach(function (node) {
+	                    totalWeight += node.weight;
 	                    node.state = 'closed';
 	                });
 	
 	                //Update the parent node
-	                node.totalWeight = result.reduce(function (prev, curr) {
-	                    return prev + curr.weight;
-	                }, 0);
+	                node.totalWeight = totalWeight;
 	                node.state = 'open';
-	                node.children = result;
+	                node.children = json;
 	
 	                //Rerender
-	                _this2.render(_this2.root);
+	                _this.render(_this.root);
 	            });
 	        },
 	        loadInitial: function loadInitial() {
-	            this.fetchData(this.secondRoot);
+	            var _this2 = this;
+	
+	            var sub = this.currentSubreddit;
+	            _d2.default.json('/api/initial?sub=' + sub + '&s1=___BEGIN__&s2=___BEGIN__', function (error, json) {
+	                _this2.root.id = json.id;
+	            });
+	            //this.fetchData(this.secondRoot);
 	        }
 	    },
 	    ready: function ready() {
 	        var _this3 = this;
 	
 	        this.state.push(this.root, this.root.children[0]);
+	        ;
 	
 	        //On load, get the list of subreddits
 	        _d2.default.json("/api/subreddits", function (error, json) {
 	            _this3.subreddits = json;
+	            _this3.currentSubreddit = json[0].id;
+	            _this3.loadInitial();
 	        });
 	
 	        this.render(this.root);
@@ -309,7 +309,7 @@
 	
 	        //Whenever the current subreddit changes, download new data
 	        currentSubreddit: function currentSubreddit() {
-	            this.secondRoot.children = [];
+	            this.root.children = [];
 	            this.loadInitial();
 	            this.render(this.root);
 	        },
