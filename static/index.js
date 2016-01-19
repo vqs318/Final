@@ -73,7 +73,7 @@
 	var containerEl = document.getElementById('chart');
 	var outerDimensions = {
 	    width: containerEl.clientWidth,
-	    height: containerEl.clientWidth
+	    height: containerEl.clientHeight
 	};
 	var margins = {
 	    x: 0,
@@ -126,7 +126,7 @@
 	var vm = new _vue2.default({
 	    el: '#main',
 	    data: {
-	        currentSubreddit: null, //'pics',
+	        currentSubreddit: 218, // (/r/unitedkingdom)
 	        subreddits: [],
 	        root: null,
 	        //links: copy(DEFAULT_LINKS),
@@ -278,7 +278,7 @@
 	        //On load, get the list of subreddits
 	        _d2.default.json("/api/subreddits", function (error, json) {
 	            _this3.subreddits = json;
-	            _this3.currentSubreddit = json[0].id;
+	            //this.currentSubreddit = json[0].id;
 	            _this3.loadInitial();
 	        });
 	    },
@@ -291,9 +291,7 @@
 	
 	        //Whenever the current subreddit changes, download new data
 	        currentSubreddit: function currentSubreddit() {
-	            this.root.children = [];
 	            this.loadInitial();
-	            this.render(this.root);
 	        },
 	        links: function links(val) {
 	            //Whenever the tree updates, rerender it with d3

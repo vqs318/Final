@@ -8,7 +8,7 @@ d3.tip = d3Tip;
 const containerEl = document.getElementById('chart');
 const outerDimensions = {
     width: containerEl.clientWidth,
-    height: containerEl.clientWidth
+    height: containerEl.clientHeight
 };
 const margins = {
     x: 0,
@@ -74,7 +74,7 @@ outerSvg.append("defs").html(`
 const vm = new Vue({
     el: '#main',
     data: {
-        currentSubreddit: null,//'pics',
+        currentSubreddit: 218,// (/r/unitedkingdom)
         subreddits: [],
         root: null,
         //links: copy(DEFAULT_LINKS),
@@ -264,7 +264,7 @@ const vm = new Vue({
         //On load, get the list of subreddits
         d3.json("/api/subreddits", (error, json) => {
             this.subreddits = json;
-            this.currentSubreddit = json[0].id;
+            //this.currentSubreddit = json[0].id;
             this.loadInitial();
         });
     },
@@ -275,9 +275,7 @@ const vm = new Vue({
         },
         //Whenever the current subreddit changes, download new data
         currentSubreddit(){
-            this.root.children = [];
             this.loadInitial();
-            this.render(this.root);
         },
         links(val){
             //Whenever the tree updates, rerender it with d3
