@@ -11,13 +11,13 @@
         <h3>Part 1</h3>
         <div class="form-group">
             <label>Subreddit</label>
-            <select class="form-control">
+            <select v-model="currentSubreddit" class="form-control">
                 <option v-for="subreddit in subreddits" v-bind:value="subreddit">
                     {{ subreddit }}
                 </option>
             </select>
         </div>
-        <div id="part-1-3d"></div>
+        <div id="chart"></div>
     </div>
     <script src="static/index.js"></script>
 </div>
