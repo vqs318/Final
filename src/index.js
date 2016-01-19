@@ -58,7 +58,7 @@ const toolTip = d3
         let weightTerm = "";
         if (d.parent) {
             let parentWeight = d.parent.totalWeight;
-            let weightDecimal = (d.weight/parentWeight).toFixed(3);
+            let weightDecimal = (d.weight / parentWeight).toFixed(3);
             weightTerm = `<br>Weight:${weightDecimal}`;
         }
         return `Word: '${d.name}'${weightTerm}`;
@@ -107,6 +107,38 @@ const vm = new Vue({
                 d.y = d.depth * 90;
             });
 
+            // Update the links…
+            var link = svg.selectAll(".link")
+                .data(links, function (d) {
+                    return d.target.id;
+                });
+
+            // Enter any new links at the parent's previous position.
+            var linkEnter = link
+                .enter()
+                .append('g')
+                .attr("class", "link");
+
+            var linkLine = linkEnter
+                .append("path")
+                .attr("d", function (d) {
+                    var o = {x: source.x, y: source.y};
+                    return diagonal({source: o, target: o});
+                })
+                .attr('stroke', 'white')
+                .style('fill', 'none')
+                .style('stroke-width', d => (d.target.weight / d.source.totalWeight * 20) + 'px');
+
+
+            // Transition links to their new position.
+            link
+                .selectAll('path')
+                .transition()
+                .duration(duration)
+                .attr("d", diagonal);
+
+            link.exit().remove();
+
             // Update the nodes…
             var node = svg.selectAll("g.node")
                 .data(nodes, node => node.id);
@@ -143,9 +175,7 @@ const vm = new Vue({
                 })
                 .attr("width", RECT_SIZE.width)
                 .attr("height", RECT_SIZE.height);
-            //.style("fill", function (d) {
-            //    return d._children ? "white" : "#fff";
-            //});
+
 
             nodeEnter.append("text")
                 .attr("x", function (d) {
@@ -171,12 +201,6 @@ const vm = new Vue({
                     return "translate(" + d.x + "," + d.y + ")";
                 });
 
-            //nodeUpdate.select("circle")
-            //    .attr("r", 4.5)
-            //.style("fill", function (d) {
-            //    return d._children ? "lightsteelblue" : "#fff";
-            //});
-
             nodeUpdate.select("text")
                 .style("fill-opacity", 1);
 
@@ -196,64 +220,6 @@ const vm = new Vue({
 
             nodeExit.select("text")
                 .style("fill-opacity", 1e-6);
-
-            // Update the links…
-            var link = svg.selectAll(".link")
-                .data(links, function (d) {
-                    return d.target.id;
-                });
-
-            // Enter any new links at the parent's previous position.
-            var linkEnter = link
-                .enter()
-                .append('g')
-                .attr("class", "link");
-
-            //link
-            //    .selectAll('path')
-            //    .attr("d", function (d) {
-            //        var o = {x: source.x, y: source.y};
-            //        return diagonal({source: o, target: o});
-            //    })
-            //    .style('stroke-width', d => (d.target.weight / d.source.totalWeight * 20) + 'px');
-
-            var linkLine = linkEnter
-                .append("path")
-                .attr("d", function (d) {
-                    var o = {x: source.x, y: source.y};
-                    return diagonal({source: o, target: o});
-                })
-                .attr('stroke', 'white')
-                .style('fill', 'none')
-                .style('stroke-width', d => (d.target.weight / d.source.totalWeight * 20) + 'px');
-
-            //linkEnter
-            //    .append("text")
-            //    .attr("transform", function (d) {
-            //        let x = (d.source.x + d.target.x) /2;
-            //        let y = (d.source.y + d.target.y) /2;
-            //        return `translate(${y}, ${x})`;
-            //    })
-            //    .style('stroke', 'white')
-            //    .text(d => d.target.weight);
-
-            // Transition links to their new position.
-            link
-                .selectAll('path')
-                .transition()
-                .duration(duration)
-                .attr("d", diagonal);
-
-            link.exit().remove();
-
-            // Transition exiting nodes to the parent's new position.
-            //link.exit().selectAll('line').transition()
-            //    .duration(duration)
-            //    .attr("d", function (d) {
-            //        var o = {x: source.x0, y: source.y0};
-            //        return diagonal({source: o, target: o});
-            //    })
-            //    .remove();
 
             // Stash the old positions for transition.
             nodes.forEach(function (d) {
