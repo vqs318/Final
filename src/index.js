@@ -2,6 +2,8 @@ import d3 from "d3";
 import Vue from 'vue'
 import clone from 'clone'
 import copy from 'shallow-copy';
+import d3Tip from "d3-tip";
+d3.tip = d3Tip;
 
 const containerEl = document.getElementById('chart');
 const outerDimensions = {
@@ -48,6 +50,22 @@ const svg = outerSvg
     .append("g")
     .attr("transform", `translate(${margins.x}, ${margins.y})`);
 
+//Setup tooltips
+const toolTip = d3
+    .tip()
+    .attr('class', 'd3-tip')
+    .html(d=> {
+        let weightTerm = "";
+        if (d.parent) {
+            let parentWeight = d.parent.totalWeight;
+            let weightDecimal = (d.weight/parentWeight).toFixed(3);
+            weightTerm = `<br>Weight:${weightDecimal}`;
+        }
+        return `Word: '${d.name}'${weightTerm}`;
+    });
+
+svg.call(toolTip);
+
 outerSvg.append("defs").html(`
   <pattern id="loader" patternUnits="userSpaceOnUse" width="100" height="100">
     <image xlink:href="static/loader.gif" x="0" y="0" width="100" height="100" />
@@ -58,7 +76,7 @@ const vm = new Vue({
     data: {
         currentSubreddit: null,//'pics',
         subreddits: [],
-        root: copy(DEFAULT_ROOT),
+        root: null,
         //links: copy(DEFAULT_LINKS),
         state: [],
         nextNodeId: 0
@@ -91,7 +109,7 @@ const vm = new Vue({
 
             // Update the nodes…
             var node = svg.selectAll("g.node")
-                .data(nodes);
+                .data(nodes, node => node.id);
 
             // Enter any new nodes at the parent's previous position.
             var nodeEnter = node
@@ -101,7 +119,9 @@ const vm = new Vue({
                 .attr("transform", d => {
                     return "translate(" + source.x0 + "," + source.y0 + ")";
                 })
-                .on("click", this.clickNode);
+                .on("click", this.clickNode)
+                .on('mouseover', toolTip.show)
+                .on('mouseout', toolTip.hide);
 
             nodeEnter
                 .append("rect")
@@ -260,21 +280,20 @@ const vm = new Vue({
                 node.children = json;
 
                 //Rerender
-                this.render(this.root);
+                this.render(node);
             });
         },
         loadInitial(){
             const sub = this.currentSubreddit;
             d3.json(`/api/initial?sub=${sub}&s1=___BEGIN__&s2=___BEGIN__`, (error, json) => {
+                this.root = copy(DEFAULT_ROOT)
                 this.root.id = json.id;
+                this.render(this.root);
             });
             //this.fetchData(this.secondRoot);
         }
     },
     ready(){
-
-        this.state.push(this.root, this.root.children[0]);
-        ;
 
         //On load, get the list of subreddits
         d3.json("/api/subreddits", (error, json) => {
@@ -282,8 +301,6 @@ const vm = new Vue({
             this.currentSubreddit = json[0].id;
             this.loadInitial();
         });
-
-        this.render(this.root);
     },
     watch: {
         subreddits(){
