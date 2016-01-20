@@ -23,7 +23,8 @@ const DEFAULT_ROOT = {
     children: [],
     x0: dimensions.width / 2,
     y0: 0,
-    state: 'open'
+    state: 'open',
+    id: 0
 };
 const RECT_SIZE = {
     width: 50,
@@ -32,6 +33,7 @@ const RECT_SIZE = {
 const duration = 750;
 
 const diagonal = d3.svg.diagonal()
+    .source(d => ({x: d.source.x, y: d.source.y + 10}))
     .projection(function (d) {
         return [d.x, d.y];
     });
@@ -39,7 +41,7 @@ const diagonal = d3.svg.diagonal()
 let tree = d3.layout.tree()
     .size([dimensions.width - (2 * margins.x), dimensions.height - (2 * margins.y)])
     .separation((a, b) => {
-        return 0.5;// return a.parent == b.parent ? 1 : 1;
+        return 5;// return a.parent == b.parent ? 1 : 1;
     });
 
 const outerSvg = d3.select("#chart").append("svg")
@@ -55,21 +57,37 @@ const toolTip = d3
     .tip()
     .attr('class', 'd3-tip')
     .html(d=> {
-        let weightTerm = "";
-        if (d.parent) {
-            let parentWeight = d.parent.totalWeight;
-            let weightDecimal = (d.weight / parentWeight).toFixed(3);
-            weightTerm = `<br>Weight:${weightDecimal}`;
+        switch (d.name) {
+            //If it's a special node, give it a unique title. Otherwise give information about the node
+            case "___BEGIN__":
+            case "<Start>":
+                return "Start Node";
+            case "___END__":
+                return "End Node";
+            default:
+                let parentWeight = d.parent.totalWeight;
+                let weightDecimal = (d.weight / parentWeight).toFixed(3);
+
+                return `Word: '${d.name}'<br>` +
+                    `Weight: ${weightDecimal}<br>` +
+                    `Occurrences: ${d.weight}`;
         }
-        return `Word: '${d.name}'${weightTerm}`;
     });
 
 svg.call(toolTip);
 
 outerSvg.append("defs").html(`
   <pattern id="loader" patternUnits="userSpaceOnUse" width="100" height="100">
-    <image xlink:href="static/loader.gif" x="0" y="0" width="100" height="100" />
-  </pattern>`);
+    <image xlink:href="static/loader.svg" width="50" height="20" />
+  </pattern>
+  <filter id="dropshadow" height="130%">
+  <feGaussianBlur in="SourceAlpha" stdDeviation="3"/> <!-- stdDeviation is how much to blur -->
+  <feOffset dx="2" dy="2" result="offsetblur"/> <!-- how much to offset -->
+  <feMerge>
+    <feMergeNode/> <!-- this contains the offset blurred image -->
+    <feMergeNode in="SourceGraphic"/> <!-- this contains the element that the filter is applied to -->
+  </feMerge>
+</filter>`);
 
 const vm = new Vue({
     el: '#main',
@@ -109,9 +127,7 @@ const vm = new Vue({
 
             // Update the links…
             var link = svg.selectAll(".link")
-                .data(links, function (d) {
-                    return d.target.id;
-                });
+                .data(links, d => d.target.id);
 
             // Enter any new links at the parent's previous position.
             var linkEnter = link
@@ -157,18 +173,17 @@ const vm = new Vue({
 
             nodeEnter
                 .append("rect")
-                .style('fill', 'white')
-                .style("stroke", d => {
-                    switch (d.state) {
-                        case "open":
-                            return "white";
-                        case "closed":
-                            return "black";
-                        case "loading":
-                            return "url(#loader)";
-
-                    }
-                })
+                //.style("stroke", d => {
+                //    switch (d.state) {
+                //        case "open":
+                //            return "white";
+                //        case "closed":
+                //            return "black";
+                //        case "loading":
+                //            return "url(#loader)";
+                //
+                //    }
+                //})
                 //Move the rectangle into the centre of the node
                 .attr("transform", d => {
                     return `translate(${-RECT_SIZE.width / 2}, ${-RECT_SIZE.height / 2})`;
@@ -179,14 +194,37 @@ const vm = new Vue({
 
             nodeEnter.append("text")
                 .attr("dy", ".35em")
-                //.style('fill', 'white')
                 .style("fill-opacity", 1e-6)
-                .style('text-anchor', 'middle')
+                .style('font-weight', d => {
+                    switch (d.name) {
+                        case "<Start>":
+                        case "___BEGIN__":
+                        case "___END__":
+                            return "bold";
+                        default:
+                            return false;
+                    }
+                });
+
+            //If the node is loading, hide the text
+            node
+                .selectAll('text')
                 .text(function (d) {
-                    let weight = d.weight ? ` (${d.weight})` : "";
-                    return d.name;
-                })
-                .style('font-size', '12px');
+                    if (d.state == 'loading')
+                        return "";
+                    else
+                        return d.name;
+                });
+
+            //If the node is loading, make it look like a spinner
+            node
+                .selectAll('rect')
+                .style('fill', d => {
+                    if (d.state == 'loading')
+                        return 'url(#loader)';
+                    else
+                        return 'white';
+                });
 
             // Transition nodes to their new position.
             var nodeUpdate = node
@@ -226,13 +264,14 @@ const vm = new Vue({
         fetchData(node){
             node.state = 'loading';
             this.render(node);
-            d3.json(`/api/markov?node=${node.id}`, (error, json) => {
+            d3.json(`/api/markov?node=${node.dbId}`, (error, json) => {
 
                 //Process the data
                 let totalWeight = 0;
                 json.forEach(node => {
                     totalWeight += node.weight;
                     node.state = 'closed';
+                    node.id = ++this.nextNodeId;
                 });
 
                 //Update the parent node
@@ -248,7 +287,7 @@ const vm = new Vue({
             const sub = this.currentSubreddit;
             d3.json(`/api/initial?sub=${sub}&s1=___BEGIN__&s2=___BEGIN__`, (error, json) => {
                 this.root = copy(DEFAULT_ROOT)
-                this.root.id = json.id;
+                this.root.dbId = json.id; //Used for queries, not for data identification
                 this.render(this.root);
             });
             //this.fetchData(this.secondRoot);
@@ -275,7 +314,7 @@ const vm = new Vue({
         links(val){
             //Whenever the tree updates, rerender it with d3
             this.render(val);
-        },
+        }
         //state(){
         //    //Whenever the word updates, fetch the new nodes
         //    this.loadInitial();

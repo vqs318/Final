@@ -1,3 +1,14 @@
 .node {
     cursor: pointer;
 }
+
+.node rect {
+    filter: url(#dropshadow);
+    stroke-width: 4px;
+    fill: white;
+}
+
+.node text {
+    text-anchor: middle;
+    font-size: 12px;
+}

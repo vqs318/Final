@@ -73,7 +73,7 @@ app.get('/api/markov', (req, res) => {
         SELECT
             edge.weight,
             too.state[2] as name,
-            too.id
+            too.id as "dbId"
         FROM
             node fromm
             JOIN edge ON fromm.id = edge.from_node_id

@@ -88,7 +88,8 @@
 	    children: [],
 	    x0: dimensions.width / 2,
 	    y0: 0,
-	    state: 'open'
+	    state: 'open',
+	    id: 0
 	};
 	var RECT_SIZE = {
 	    width: 50,
@@ -96,12 +97,14 @@
 	};
 	var duration = 750;
 	
-	var diagonal = _d2.default.svg.diagonal().projection(function (d) {
+	var diagonal = _d2.default.svg.diagonal().source(function (d) {
+	    return { x: d.source.x, y: d.source.y + 10 };
+	}).projection(function (d) {
 	    return [d.x, d.y];
 	});
 	
 	var tree = _d2.default.layout.tree().size([dimensions.width - 2 * margins.x, dimensions.height - 2 * margins.y]).separation(function (a, b) {
-	    return 0.5; // return a.parent == b.parent ? 1 : 1;
+	    return 5; // return a.parent == b.parent ? 1 : 1;
 	});
 	
 	var outerSvg = _d2.default.select("#chart").append("svg").attr("width", outerDimensions.width).attr("height", outerDimensions.height);
@@ -110,18 +113,24 @@
 	
 	//Setup tooltips
 	var toolTip = _d2.default.tip().attr('class', 'd3-tip').html(function (d) {
-	    var weightTerm = "";
-	    if (d.parent) {
-	        var parentWeight = d.parent.totalWeight;
-	        var weightDecimal = (d.weight / parentWeight).toFixed(3);
-	        weightTerm = '<br>Weight:' + weightDecimal;
+	    switch (d.name) {
+	        //If it's a special node, give it a unique title. Otherwise give information about the node
+	        case "___BEGIN__":
+	        case "<Start>":
+	            return "Start Node";
+	        case "___END__":
+	            return "End Node";
+	        default:
+	            var parentWeight = d.parent.totalWeight;
+	            var weightDecimal = (d.weight / parentWeight).toFixed(3);
+	
+	            return 'Word: \'' + d.name + '\'<br>' + ('Weight: ' + weightDecimal + '<br>') + ('Occurrences: ' + d.weight);
 	    }
-	    return 'Word: \'' + d.name + '\'' + weightTerm;
 	});
 	
 	svg.call(toolTip);
 	
-	outerSvg.append("defs").html('\n  <pattern id="loader" patternUnits="userSpaceOnUse" width="100" height="100">\n    <image xlink:href="static/loader.gif" x="0" y="0" width="100" height="100" />\n  </pattern>');
+	outerSvg.append("defs").html('\n  <pattern id="loader" patternUnits="userSpaceOnUse" width="100" height="100">\n    <image xlink:href="static/loader.svg" width="50" height="20" />\n  </pattern>\n  <filter id="dropshadow" height="130%">\n  <feGaussianBlur in="SourceAlpha" stdDeviation="3"/> <!-- stdDeviation is how much to blur -->\n  <feOffset dx="2" dy="2" result="offsetblur"/> <!-- how much to offset -->\n  <feMerge>\n    <feMergeNode/> <!-- this contains the offset blurred image -->\n    <feMergeNode in="SourceGraphic"/> <!-- this contains the element that the filter is applied to -->\n  </feMerge>\n</filter>');
 	
 	var vm = new _vue2.default({
 	    el: '#main',
@@ -188,28 +197,43 @@
 	                return "translate(" + source.x0 + "," + source.y0 + ")";
 	            }).on("click", this.clickNode).on('mouseover', toolTip.show).on('mouseout', toolTip.hide);
 	
-	            nodeEnter.append("rect").style('fill', 'white').style("stroke", function (d) {
-	                switch (d.state) {
-	                    case "open":
-	                        return "white";
-	                    case "closed":
-	                        return "black";
-	                    case "loading":
-	                        return "url(#loader)";
-	
-	                }
-	            })
+	            nodeEnter.append("rect")
+	            //.style("stroke", d => {
+	            //    switch (d.state) {
+	            //        case "open":
+	            //            return "white";
+	            //        case "closed":
+	            //            return "black";
+	            //        case "loading":
+	            //            return "url(#loader)";
+	            //
+	            //    }
+	            //})
 	            //Move the rectangle into the centre of the node
 	            .attr("transform", function (d) {
 	                return 'translate(' + -RECT_SIZE.width / 2 + ', ' + -RECT_SIZE.height / 2 + ')';
 	            }).attr("width", RECT_SIZE.width).attr("height", RECT_SIZE.height);
 	
-	            nodeEnter.append("text").attr("dy", ".35em")
-	            //.style('fill', 'white')
-	            .style("fill-opacity", 1e-6).style('text-anchor', 'middle').text(function (d) {
-	                var weight = d.weight ? ' (' + d.weight + ')' : "";
-	                return d.name;
-	            }).style('font-size', '12px');
+	            nodeEnter.append("text").attr("dy", ".35em").style("fill-opacity", 1e-6).style('font-weight', function (d) {
+	                switch (d.name) {
+	                    case "<Start>":
+	                    case "___BEGIN__":
+	                    case "___END__":
+	                        return "bold";
+	                    default:
+	                        return false;
+	                }
+	            });
+	
+	            //If the node is loading, hide the text
+	            node.selectAll('text').text(function (d) {
+	                if (d.state == 'loading') return "";else return d.name;
+	            });
+	
+	            //If the node is loading, make it look like a spinner
+	            node.selectAll('rect').style('fill', function (d) {
+	                if (d.state == 'loading') return 'url(#loader)';else return 'white';
+	            });
 	
 	            // Transition nodes to their new position.
 	            var nodeUpdate = node.transition().duration(duration).attr("transform", function (d) {
@@ -238,13 +262,14 @@
 	
 	            node.state = 'loading';
 	            this.render(node);
-	            _d2.default.json('/api/markov?node=' + node.id, function (error, json) {
+	            _d2.default.json('/api/markov?node=' + node.dbId, function (error, json) {
 	
 	                //Process the data
 	                var totalWeight = 0;
 	                json.forEach(function (node) {
 	                    totalWeight += node.weight;
 	                    node.state = 'closed';
+	                    node.id = ++_this.nextNodeId;
 	                });
 	
 	                //Update the parent node
@@ -262,7 +287,7 @@
 	            var sub = this.currentSubreddit;
 	            _d2.default.json('/api/initial?sub=' + sub + '&s1=___BEGIN__&s2=___BEGIN__', function (error, json) {
 	                _this2.root = (0, _shallowCopy2.default)(DEFAULT_ROOT);
-	                _this2.root.id = json.id;
+	                _this2.root.dbId = json.id; //Used for queries, not for data identification
 	                _this2.render(_this2.root);
 	            });
 	            //this.fetchData(this.secondRoot);
@@ -293,13 +318,14 @@
 	            //Whenever the tree updates, rerender it with d3
 	            this.render(val);
 	        }
+	        //state(){
+	        //    //Whenever the word updates, fetch the new nodes
+	        //    this.loadInitial();
+	        //}
+	
 	    }
 	});
 	
-	//state(){
-	//    //Whenever the word updates, fetch the new nodes
-	//    this.loadInitial();
-	//}
 	window.vm = vm;
 
 /***/ },
