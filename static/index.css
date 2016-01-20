@@ -4,6 +4,7 @@
 
 .node rect {
     filter: url(#dropshadow);
+    filter: drop-shadow(4px 4px 3px rgb(0, 0, 0));g
     stroke-width: 4px;
     fill: white;
 }
