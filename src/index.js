@@ -180,6 +180,11 @@ const vm = new Vue({
             this.$els.sentence.scrollIntoView(true);
         },
 
+        reset(){
+            this.root.children = [];
+            this.render(this.root);
+        },
+
         /**
          * Updates the SVG render
          * @param source The node element that we're adding new nodes to. Used only for sake of transitions
@@ -267,7 +272,8 @@ const vm = new Vue({
                 .attr("height", RECT_SIZE.height);
 
 
-            nodeEnter.append("text")
+            nodeEnter
+                .append("text")
                 .attr("dy", ".35em")
                 .style("fill-opacity", 1e-6)
                 .style('font-weight', d => {
@@ -283,7 +289,7 @@ const vm = new Vue({
 
             //If the node is loading, hide the text
             node
-                .selectAll('text')
+                .select('text')
                 .text(d => {
                     if (d.state == 'loading')
                         return "";
@@ -293,7 +299,7 @@ const vm = new Vue({
 
             //If the node is loading, make the <rect> look like a spinner
             node
-                .selectAll('rect')
+                .select('rect')
                 .style('fill', d => {
                     if (d.state == 'loading')
                         return 'url(#loader)';
@@ -373,7 +379,7 @@ const vm = new Vue({
         loadInitial(){
             const sub = this.currentSubreddit;
             d3.json(`/api/initial?sub=${sub}&s1=___BEGIN__&s2=___BEGIN__`, (error, json) => {
-                this.root = copy(DEFAULT_ROOT);
+                this.root = clone(DEFAULT_ROOT);
                 this.root.dbId = json.id; //Used for queries, not for data identification
                 this.render(this.root);
             });

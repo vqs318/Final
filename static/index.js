@@ -216,6 +216,10 @@
 	            //Show the new sentence
 	            this.$els.sentence.scrollIntoView(true);
 	        },
+	        reset: function reset() {
+	            this.root.children = [];
+	            this.render(this.root);
+	        },
 	
 	        /**
 	         * Updates the SVG render
@@ -295,12 +299,12 @@
 	            });
 	
 	            //If the node is loading, hide the text
-	            node.selectAll('text').text(function (d) {
+	            node.select('text').text(function (d) {
 	                if (d.state == 'loading') return "";else return d.name;
 	            });
 	
 	            //If the node is loading, make the <rect> look like a spinner
-	            node.selectAll('rect').style('fill', function (d) {
+	            node.select('rect').style('fill', function (d) {
 	                if (d.state == 'loading') return 'url(#loader)';else return 'white';
 	            });
 	
@@ -366,7 +370,7 @@
 	
 	            var sub = this.currentSubreddit;
 	            _d2.default.json('/api/initial?sub=' + sub + '&s1=___BEGIN__&s2=___BEGIN__', function (error, json) {
-	                _this2.root = (0, _shallowCopy2.default)(DEFAULT_ROOT);
+	                _this2.root = (0, _clone2.default)(DEFAULT_ROOT);
 	                _this2.root.dbId = json.id; //Used for queries, not for data identification
 	                _this2.render(_this2.root);
 	            });
