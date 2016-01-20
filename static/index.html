@@ -59,6 +59,7 @@
                 <li>Press &lt;Start&gt;</li>
                 <li>Click a word from the row presented</li>
                 <li>Continue making branches by clicking words</li>
+                <li>Right click a node to construct a sentence from the node and its parents</li>
             </ul>
 
         </div>
@@ -69,6 +70,10 @@
                     {{ subreddit.name }}
                 </option>
             </select>
+        </div>
+        <div class="form-group">
+            <label>Constructed Sentence</label>
+            <input v-el:sentence type="text" readonly v-model="sentence" class="form-control"/>
         </div>
     </div>
     <div id="chart" style="width: 100%; height: 10000px; float: left"></div>

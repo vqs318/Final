@@ -97,7 +97,8 @@ const vm = new Vue({
         root: null,
         //links: copy(DEFAULT_LINKS),
         state: [],
-        nextNodeId: 0
+        nextNodeId: 0,
+        sentence: ""
     },
     methods: {
         clickNode(d) {
@@ -114,6 +115,35 @@ const vm = new Vue({
                 }
                 this.render(d);
             }
+        },
+        constructSentence(node){
+            const sentenceArray = [];
+            const endOfSentence = ['.', '!', '?']
+            let currentNode = node;
+
+            while (currentNode.parent) {
+                sentenceArray.push(currentNode.name);
+                currentNode = currentNode.parent;
+            }
+
+            this.sentence = sentenceArray
+                .reverse()
+                .map((word, i)=> {
+                    const capitalised = word[0].toUpperCase() + word.slice(1);
+
+                    //Capitalise words if they're followed by a full stop or they're the first word.
+                    if (i == 0 ||
+                        ( (i + 1) in sentenceArray && endOfSentence.indexOf(sentenceArray[i - 1]) != -1)
+                    )
+                        return capitalised;
+                    else
+                        return word;
+                })
+                .join(" ");
+
+            d3.event.preventDefault();
+
+            this.$els.sentence.scrollIntoView(true);
         },
         render(source) {
 
@@ -167,6 +197,7 @@ const vm = new Vue({
                 .attr("transform", d => {
                     return "translate(" + source.x0 + "," + source.y0 + ")";
                 })
+                .on("contextmenu", this.constructSentence)
                 .on("click", this.clickNode)
                 .on('mouseover', toolTip.show)
                 .on('mouseout', toolTip.hide);

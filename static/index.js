@@ -140,7 +140,8 @@
 	        root: null,
 	        //links: copy(DEFAULT_LINKS),
 	        state: [],
-	        nextNodeId: 0
+	        nextNodeId: 0,
+	        sentence: ""
 	    },
 	    methods: {
 	        clickNode: function clickNode(d) {
@@ -156,6 +157,27 @@
 	                }
 	                this.render(d);
 	            }
+	        },
+	        constructSentence: function constructSentence(node) {
+	            var sentenceArray = [];
+	            var endOfSentence = ['.', '!', '?'];
+	            var currentNode = node;
+	
+	            while (currentNode.parent) {
+	                sentenceArray.push(currentNode.name);
+	                currentNode = currentNode.parent;
+	            }
+	
+	            this.sentence = sentenceArray.reverse().map(function (word, i) {
+	                var capitalised = word[0].toUpperCase() + word.slice(1);
+	
+	                //Capitalise words if they're followed by a full stop or they're the first word.
+	                if (i == 0 || i + 1 in sentenceArray && endOfSentence.indexOf(sentenceArray[i - 1]) != -1) return capitalised;else return word;
+	            }).join(" ");
+	
+	            _d2.default.event.preventDefault();
+	
+	            this.$els.sentence.scrollIntoView(true);
 	        },
 	        render: function render(source) {
 	
@@ -195,7 +217,7 @@
 	            // Enter any new nodes at the parent's previous position.
 	            var nodeEnter = node.enter().append("g").attr("class", "node").attr("transform", function (d) {
 	                return "translate(" + source.x0 + "," + source.y0 + ")";
-	            }).on("click", this.clickNode).on('mouseover', toolTip.show).on('mouseout', toolTip.hide);
+	            }).on("contextmenu", this.constructSentence).on("click", this.clickNode).on('mouseover', toolTip.show).on('mouseout', toolTip.hide);
 	
 	            nodeEnter.append("rect")
 	            //.style("stroke", d => {
