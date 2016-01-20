@@ -178,20 +178,15 @@ const vm = new Vue({
 
 
             nodeEnter.append("text")
-                .attr("x", function (d) {
-                    return d.children || d._children ? -10 : 10;
-                })
                 .attr("dy", ".35em")
-                .attr("text-anchor", function (d) {
-                    return d.children || d._children ? "end" : "start";
-                })
                 //.style('fill', 'white')
                 .style("fill-opacity", 1e-6)
                 .style('text-anchor', 'middle')
                 .text(function (d) {
                     let weight = d.weight ? ` (${d.weight})` : "";
                     return d.name;
-                });
+                })
+                .style('font-size', '12px');
 
             // Transition nodes to their new position.
             var nodeUpdate = node

@@ -204,16 +204,12 @@
 	                return 'translate(' + -RECT_SIZE.width / 2 + ', ' + -RECT_SIZE.height / 2 + ')';
 	            }).attr("width", RECT_SIZE.width).attr("height", RECT_SIZE.height);
 	
-	            nodeEnter.append("text").attr("x", function (d) {
-	                return d.children || d._children ? -10 : 10;
-	            }).attr("dy", ".35em").attr("text-anchor", function (d) {
-	                return d.children || d._children ? "end" : "start";
-	            })
+	            nodeEnter.append("text").attr("dy", ".35em")
 	            //.style('fill', 'white')
 	            .style("fill-opacity", 1e-6).style('text-anchor', 'middle').text(function (d) {
 	                var weight = d.weight ? ' (' + d.weight + ')' : "";
 	                return d.name;
-	            });
+	            }).style('font-size', '12px');
 	
 	            // Transition nodes to their new position.
 	            var nodeUpdate = node.transition().duration(duration).attr("transform", function (d) {
