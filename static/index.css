@@ -3,8 +3,9 @@
 }
 
 .node rect {
+    /*Hack so that the drop shadow works in firefox and chrome*/
     filter: url(#dropshadow);
-    filter: drop-shadow(4px 4px 3px rgb(0, 0, 0));g
+    filter: drop-shadow(4px 4px 3px rgb(0, 0, 0));
     stroke-width: 4px;
     fill: white;
 }
@@ -12,4 +13,9 @@
 .node text {
     text-anchor: middle;
     font-size: 12px;
+}
+
+.link {
+    stroke: white;
+    fill: none;
 }

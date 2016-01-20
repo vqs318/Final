@@ -70,45 +70,65 @@
 	
 	_d2.default.tip = _d3Tip2.default;
 	
+	//SVG rendering constants
+	//Imports
 	var containerEl = document.getElementById('chart');
+	
+	//Make the SVG as big as the screen makes it
 	var outerDimensions = {
 	    width: containerEl.clientWidth,
 	    height: containerEl.clientHeight
 	};
+	
+	//Move the first node down from the top slightly.
 	var margins = {
 	    x: 0,
 	    y: 50
 	};
+	
+	//Inner dimensions (minus the margin)
 	var dimensions = {
 	    width: outerDimensions.width - 2 * margins.x,
 	    height: outerDimensions.height - 2 * margins.y
 	};
+	
+	//The root node that we use regardless of subreddit
 	var DEFAULT_ROOT = {
 	    name: "<Start>",
 	    children: [],
 	    x0: dimensions.width / 2,
 	    y0: 0,
-	    state: 'open',
+	    state: 'closed',
 	    id: 0
 	};
+	
+	//Size of each <rect> node
 	var RECT_SIZE = {
 	    width: 50,
 	    height: 20
 	};
+	
+	//The length of time it takes to open nodes (animation time)
 	var duration = 750;
 	
+	//Calculate the transition locations used for the edges (lines).
+	//Note that source.y is + 10. This means that the paths don't go to the centre of the nodes, but
+	//rather touch the edges
 	var diagonal = _d2.default.svg.diagonal().source(function (d) {
 	    return { x: d.source.x, y: d.source.y + 10 };
 	}).projection(function (d) {
 	    return [d.x, d.y];
 	});
 	
+	//D3 tree layout for calculating node positions
 	var tree = _d2.default.layout.tree().size([dimensions.width - 2 * margins.x, dimensions.height - 2 * margins.y]).separation(function (a, b) {
 	    return 5; // return a.parent == b.parent ? 1 : 1;
 	});
 	
+	//Create the SVG element
 	var outerSvg = _d2.default.select("#chart").append("svg").attr("width", outerDimensions.width).attr("height", outerDimensions.height);
 	
+	//Create a group inside the SVG that exludes the margin
 	var svg = outerSvg.append("g").attr("transform", 'translate(' + margins.x + ', ' + margins.y + ')');
 	
 	//Setup tooltips
@@ -127,23 +147,31 @@
 	            return 'Word: \'' + d.name + '\'<br>' + ('Weight: ' + weightDecimal + '<br>') + ('Occurrences: ' + d.weight);
 	    }
 	});
-	
 	svg.call(toolTip);
 	
+	//The SVG 'defs' section. Contains the loading spinner and a drop shadow implementation for Chrome.
 	outerSvg.append("defs").html('\n  <pattern id="loader" patternUnits="userSpaceOnUse" width="100" height="100">\n    <image xlink:href="static/loader.svg" width="50" height="20" />\n  </pattern>\n  <filter id="dropshadow" height="130%">\n  <feGaussianBlur in="SourceAlpha" stdDeviation="3"/> <!-- stdDeviation is how much to blur -->\n  <feOffset dx="2" dy="2" result="offsetblur"/> <!-- how much to offset -->\n  <feMerge>\n    <feMergeNode/> <!-- this contains the offset blurred image -->\n    <feMergeNode in="SourceGraphic"/> <!-- this contains the element that the filter is applied to -->\n  </feMerge>\n</filter>');
 	
 	var vm = new _vue2.default({
 	    el: '#main',
 	    data: {
 	        currentSubreddit: 218, // (/r/unitedkingdom)
-	        subreddits: [],
-	        root: null,
-	        //links: copy(DEFAULT_LINKS),
-	        state: [],
-	        nextNodeId: 0,
-	        sentence: ""
+	        subreddits: [], //List of available subreddits
+	        root: null, //The root node of the tree
+	        nextNodeId: 0, //Id to give the next generated node
+	        sentence: "", //The current sentence constructed by the user,
+	        settings: {
+	            orderBy: 'largest',
+	            numNodes: 10
+	        }
 	    },
 	    methods: {
+	        /**
+	         * When someone left clicks a node, fetch data for them if they have no data.
+	         * If they have data, toggle their children.
+	         * @param d. The node we've clicked on.
+	         */
+	
 	        clickNode: function clickNode(d) {
 	            if (!d.children && !d._children) {
 	                this.fetchData(d);
@@ -158,16 +186,23 @@
 	                this.render(d);
 	            }
 	        },
+	
+	        /**
+	         * Construct a sentence by walking upwards in the tree from the selected node.
+	         * @param node
+	         */
 	        constructSentence: function constructSentence(node) {
 	            var sentenceArray = [];
 	            var endOfSentence = ['.', '!', '?'];
-	            var currentNode = node;
 	
+	            //Loop until the root node, adding each word to the sentence array
+	            var currentNode = node;
 	            while (currentNode.parent) {
 	                sentenceArray.push(currentNode.name);
 	                currentNode = currentNode.parent;
 	            }
 	
+	            //Reverse the array and capitalise words if necessary, then join the array into a sentence
 	            this.sentence = sentenceArray.reverse().map(function (word, i) {
 	                var capitalised = word[0].toUpperCase() + word.slice(1);
 	
@@ -175,62 +210,74 @@
 	                if (i == 0 || i + 1 in sentenceArray && endOfSentence.indexOf(sentenceArray[i - 1]) != -1) return capitalised;else return word;
 	            }).join(" ");
 	
+	            //Stop the right click menu showing
 	            _d2.default.event.preventDefault();
 	
+	            //Show the new sentence
 	            this.$els.sentence.scrollIntoView(true);
 	        },
+	
+	        /**
+	         * Updates the SVG render
+	         * @param source The node element that we're adding new nodes to. Used only for sake of transitions
+	         */
 	        render: function render(source) {
 	
+	            //Use the D3 tree layout to generate nodes and links
 	            var nodes = tree.nodes(this.root).reverse();
 	            var links = tree.links(nodes);
 	
-	            // Normalize for fixed-depth.
+	            // Normalize the nodes so that each depth level is always same distance from each other.
+	            // As opposed to the normal d3.tree behaviour which is to make the distance shorter as the
+	            // tree becomes higher, in order to always use up all vertical space (which we don't want)
 	            nodes.forEach(function (d) {
 	                d.y = d.depth * 90;
 	            });
 	
-	            // Update the links…
+	            //
+	            //Render the links
+	            //
+	
+	            // Update the links with data
 	            var link = svg.selectAll(".link").data(links, function (d) {
 	                return d.target.id;
 	            });
 	
-	            // Enter any new links at the parent's previous position.
-	            var linkEnter = link.enter().append('g').attr("class", "link");
-	
-	            var linkLine = linkEnter.append("path").attr("d", function (d) {
+	            // For each new link, create a path between the two nodes
+	            link.enter().append("path").attr("class", "link").attr("d", function (d) {
 	                var o = { x: source.x, y: source.y };
 	                return diagonal({ source: o, target: o });
-	            }).attr('stroke', 'white').style('fill', 'none').style('stroke-width', function (d) {
+	            })
+	            //The stroke width is a function of the weighting
+	            .style('stroke-width', function (d) {
 	                return d.target.weight / d.source.totalWeight * 20 + 'px';
 	            });
 	
 	            // Transition links to their new position.
-	            link.selectAll('path').transition().duration(duration).attr("d", diagonal);
+	            link.transition().duration(duration).attr("d", diagonal);
 	
-	            link.exit().remove();
+	            // Transition exiting links to the parent node before deleting
+	            link.exit().transition().duration(duration).attr("d", function (d) {
+	                var o = { x: source.x, y: source.y };
+	                return diagonal({ source: o, target: o });
+	            }).remove();
 	
-	            // Update the nodes…
+	            //
+	            //Render the nodes
+	            //
+	
+	            // Update the nodes with data
 	            var node = svg.selectAll("g.node").data(nodes, function (node) {
 	                return node.id;
 	            });
 	
+	            // Each node is a <g> element containing a <rect> and <text>
 	            // Enter any new nodes at the parent's previous position.
 	            var nodeEnter = node.enter().append("g").attr("class", "node").attr("transform", function (d) {
 	                return "translate(" + source.x0 + "," + source.y0 + ")";
 	            }).on("contextmenu", this.constructSentence).on("click", this.clickNode).on('mouseover', toolTip.show).on('mouseout', toolTip.hide);
 	
 	            nodeEnter.append("rect")
-	            //.style("stroke", d => {
-	            //    switch (d.state) {
-	            //        case "open":
-	            //            return "white";
-	            //        case "closed":
-	            //            return "black";
-	            //        case "loading":
-	            //            return "url(#loader)";
-	            //
-	            //    }
-	            //})
 	            //Move the rectangle into the centre of the node
 	            .attr("transform", function (d) {
 	                return 'translate(' + -RECT_SIZE.width / 2 + ', ' + -RECT_SIZE.height / 2 + ')';
@@ -252,7 +299,7 @@
 	                if (d.state == 'loading') return "";else return d.name;
 	            });
 	
-	            //If the node is loading, make it look like a spinner
+	            //If the node is loading, make the <rect> look like a spinner
 	            node.selectAll('rect').style('fill', function (d) {
 	                if (d.state == 'loading') return 'url(#loader)';else return 'white';
 	            });
@@ -262,6 +309,7 @@
 	                return "translate(" + d.x + "," + d.y + ")";
 	            });
 	
+	            //Hide text while doing so
 	            nodeUpdate.select("text").style("fill-opacity", 1);
 	
 	            // Transition exiting nodes to the parent's new position.
@@ -269,8 +317,7 @@
 	                return "translate(" + source.x + "," + source.y + ")";
 	            }).remove();
 	
-	            nodeExit.select("circle").attr("r", 1e-6);
-	
+	            //Hide the text if we're about to delete a node
 	            nodeExit.select("text").style("fill-opacity", 1e-6);
 	
 	            // Stash the old positions for transition.
@@ -279,12 +326,19 @@
 	                d.y0 = d.y;
 	            });
 	        },
+	
+	        /**
+	         * Ask the database for data, using the node's dbId: its index in the database
+	         */
 	        fetchData: function fetchData(node) {
 	            var _this = this;
 	
+	            //Set the loading state on the parent so that it turns into a spinner
 	            node.state = 'loading';
 	            this.render(node);
-	            _d2.default.json('/api/markov?node=' + node.dbId, function (error, json) {
+	
+	            //Request the data
+	            _d2.default.json('/api/markov?node=' + node.dbId + '&order=' + this.settings.orderBy + '&num=' + this.settings.numNodes, function (error, json) {
 	
 	                //Process the data
 	                var totalWeight = 0;
@@ -303,6 +357,10 @@
 	                _this.render(node);
 	            });
 	        },
+	
+	        /**
+	         * Fetches the dbId of the root node which we always need.
+	         */
 	        loadInitial: function loadInitial() {
 	            var _this2 = this;
 	
@@ -312,7 +370,6 @@
 	                _this2.root.dbId = json.id; //Used for queries, not for data identification
 	                _this2.render(_this2.root);
 	            });
-	            //this.fetchData(this.secondRoot);
 	        }
 	    },
 	    ready: function ready() {
@@ -321,7 +378,6 @@
 	        //On load, get the list of subreddits
 	        _d2.default.json("/api/subreddits", function (error, json) {
 	            _this3.subreddits = json;
-	            //this.currentSubreddit = json[0].id;
 	            _this3.loadInitial();
 	        });
 	    },
@@ -335,19 +391,11 @@
 	        //Whenever the current subreddit changes, download new data
 	        currentSubreddit: function currentSubreddit() {
 	            this.loadInitial();
-	        },
-	        links: function links(val) {
-	            //Whenever the tree updates, rerender it with d3
-	            this.render(val);
 	        }
-	        //state(){
-	        //    //Whenever the word updates, fetch the new nodes
-	        //    this.loadInitial();
-	        //}
-	
 	    }
 	});
 	
+	//Export the vm to the window for debugging
 	window.vm = vm;
 
 /***/ },
