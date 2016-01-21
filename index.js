@@ -55,11 +55,16 @@ app.get('/api/initial', (req, res) => {
         });
 });
 
-var orderMap = {
-    'largest': 'desc',
-    'smallest': 'asc',
-    'random': 'random()'
-};
+function getOrder(request) {
+    switch (request) {
+        case 'largest':
+            return 'edge.weight DESC';
+        case 'smallest':
+            return 'edge.weight ASC';
+        case 'random':
+            return 'random()';
+    }
+}
 app.get('/api/markov', (req, res) => {
     var query = knex
         .select(knex.raw(`
@@ -75,39 +80,9 @@ app.get('/api/markov', (req, res) => {
         .where(knex.raw(
             'fromm.id = ?', [req.query.node]
         ))
-        .orderBy('edge.weight', orderMap[req.query.order])
+        .orderByRaw(getOrder(req.query.order))
         .limit(req.query.num);
-    //
-    //switch (req.query.order) {
-    //    case "largest":
-    //        query = query.orderByRaw('edge.weight DESC');
-    //        break;
-    //    case "smallest":
-    //        query = query.orderByRaw('edge.weight ASC');
-    //        break;
-    //    case "random":
-    //        query = query.orderByRaw('random()');
-    //        break;
-    //    default:
-    //        throw new Error('No order specified!');
-    //}
 
-    //db.many(`
-    //    SELECT
-    //        edge.weight,
-    //        too.state[2] as name,
-    //        too.id as "dbId"
-    //    FROM
-    //        node fromm
-    //        JOIN edge ON fromm.id = edge.from_node_id
-    //       JOIN node too ON too.id = edge.to_node_id
-    //    WHERE
-    //        fromm.id = $1
-    //        --AND key ~ '[[:alnum:]_]'
-    //    ORDER BY edge.weight DESC
-    //    LIMIT 10;
-    //`, [req.query.node]
-    //    )
     query.then(function (data) {
             res.send(data);
         })

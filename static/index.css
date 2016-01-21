@@ -15,6 +15,16 @@
     font-size: 12px;
 }
 
+.node.root-leaf rect{
+    stroke:white;
+    stroke-width: 1px;
+    fill: rgb(43, 62, 80);
+}
+
+.node.root-leaf text{
+    fill: white;
+}
+
 .link {
     stroke: white;
     fill: none;

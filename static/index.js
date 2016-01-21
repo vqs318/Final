@@ -218,7 +218,17 @@
 	        },
 	        reset: function reset() {
 	            this.root.children = [];
+	            this.root._children = [];
 	            this.render(this.root);
+	        },
+	
+	        /**
+	         * Returns true if the node is a root or leaf node in the tree.
+	         * Note, returns false for nodes whose children haven't been loaded
+	         * @returns {boolean}
+	         */
+	        rootOrLeaf: function rootOrLeaf(node) {
+	            return node.isLeaf || node.children && node.children.length == 0 || !node.parent;
 	        },
 	
 	        /**
@@ -273,7 +283,7 @@
 	            // Update the nodes with data
 	            var node = svg.selectAll("g.node").data(nodes, function (node) {
 	                return node.id;
-	            });
+	            }).classed('root-leaf', this.rootOrLeaf);
 	
 	            // Each node is a <g> element containing a <rect> and <text>
 	            // Enter any new nodes at the parent's previous position.
@@ -283,9 +293,11 @@
 	
 	            nodeEnter.append("rect")
 	            //Move the rectangle into the centre of the node
-	            .attr("transform", function (d) {
+	            .attr("transform", function (d, i) {
 	                return 'translate(' + -RECT_SIZE.width / 2 + ', ' + -RECT_SIZE.height / 2 + ')';
-	            }).attr("width", RECT_SIZE.width).attr("height", RECT_SIZE.height);
+	            }).attr("width", function (d, i) {
+	                return RECT_SIZE.width;
+	            }).attr("height", RECT_SIZE.height);
 	
 	            nodeEnter.append("text").attr("dy", ".35em").style("fill-opacity", 1e-6).style('font-weight', function (d) {
 	                switch (d.name) {
@@ -299,18 +311,29 @@
 	            });
 	
 	            //If the node is loading, hide the text
+	            //Also calculate text bounding boxes for rectangle size and resize the rectangles to fit
+	            var textWidths = [];
 	            node.select('text').text(function (d) {
 	                if (d.state == 'loading') return "";else return d.name;
+	            }).each(function () {
+	                //Make sure the rectangle is RECT_SIZE or bigger
+	                var calculated = this.getBBox().width + 5;
+	                textWidths.push(Math.max(RECT_SIZE.width, calculated));
 	            });
 	
-	            //If the node is loading, make the <rect> look like a spinner
+	            //If the node is loading, make the <rect> look like a spinner.
+	            //Also update its width to match the text
 	            node.select('rect').style('fill', function (d) {
-	                if (d.state == 'loading') return 'url(#loader)';else return 'white';
+	                return d.state == 'loading' ? 'url(#loader)' : null;
+	            }).attr('width', function (d, i) {
+	                return textWidths[i];
+	            }).attr("transform", function (d, i) {
+	                return 'translate(' + -textWidths[i] / 2 + ', ' + -RECT_SIZE.height / 2 + ')';
 	            });
 	
 	            // Transition nodes to their new position.
 	            var nodeUpdate = node.transition().duration(duration).attr("transform", function (d) {
-	                return "translate(" + d.x + "," + d.y + ")";
+	                return 'translate(' + d.x + ', ' + d.y + ')';
 	            });
 	
 	            //Hide text while doing so
@@ -318,7 +341,7 @@
 	
 	            // Transition exiting nodes to the parent's new position.
 	            var nodeExit = node.exit().transition().duration(duration).attr("transform", function (d) {
-	                return "translate(" + source.x + "," + source.y + ")";
+	                return 'translate(' + source.x + ', ' + source.y + ')';
 	            }).remove();
 	
 	            //Hide the text if we're about to delete a node
@@ -342,7 +365,7 @@
 	            this.render(node);
 	
 	            //Request the data
-	            _d2.default.json('/api/markov?node=' + node.dbId + '&order=' + this.settings.orderBy + '&num=' + this.settings.numNodes, function (error, json) {
+	            _d2.default.json('/api/markov?node=' + node.dbId + '&order=' + this.settings.orderBy + '&num=' + this.settings.numNodes).get(function (error, json) {
 	
 	                //Process the data
 	                var totalWeight = 0;
@@ -356,6 +379,7 @@
 	                node.totalWeight = totalWeight;
 	                node.state = 'open';
 	                node.children = json;
+	                node.isLeaf = json.length == 0;
 	
 	                //Rerender
 	                _this.render(node);

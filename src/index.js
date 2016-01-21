@@ -182,7 +182,17 @@ const vm = new Vue({
 
         reset(){
             this.root.children = [];
+            this.root._children = [];
             this.render(this.root);
+        },
+
+        /**
+         * Returns true if the node is a root or leaf node in the tree.
+         * Note, returns false for nodes whose children haven't been loaded
+         * @returns {boolean}
+         */
+        rootOrLeaf(node){
+            return node.isLeaf || (node.children && node.children.length == 0) || !node.parent;
         },
 
         /**
@@ -246,7 +256,8 @@ const vm = new Vue({
             // Update the nodes with data
             var node = svg
                 .selectAll("g.node")
-                .data(nodes, node => node.id);
+                .data(nodes, node => node.id)
+                .classed('root-leaf', this.rootOrLeaf);
 
             // Each node is a <g> element containing a <rect> and <text>
             // Enter any new nodes at the parent's previous position.
@@ -265,12 +276,11 @@ const vm = new Vue({
             nodeEnter
                 .append("rect")
                 //Move the rectangle into the centre of the node
-                .attr("transform", d => {
+                .attr("transform", (d, i) => {
                     return `translate(${-RECT_SIZE.width / 2}, ${-RECT_SIZE.height / 2})`;
                 })
-                .attr("width", RECT_SIZE.width)
+                .attr("width", (d, i) => RECT_SIZE.width)
                 .attr("height", RECT_SIZE.height);
-
 
             nodeEnter
                 .append("text")
@@ -288,6 +298,8 @@ const vm = new Vue({
                 });
 
             //If the node is loading, hide the text
+            //Also calculate text bounding boxes for rectangle size and resize the rectangles to fit
+            const textWidths = [];
             node
                 .select('text')
                 .text(d => {
@@ -295,25 +307,28 @@ const vm = new Vue({
                         return "";
                     else
                         return d.name;
+                })
+                .each(function () {
+                    //Make sure the rectangle is RECT_SIZE or bigger
+                    const calculated = this.getBBox().width + 5;
+                    textWidths.push(Math.max(RECT_SIZE.width, calculated));
                 });
 
-            //If the node is loading, make the <rect> look like a spinner
+            //If the node is loading, make the <rect> look like a spinner.
+            //Also update its width to match the text
             node
                 .select('rect')
-                .style('fill', d => {
-                    if (d.state == 'loading')
-                        return 'url(#loader)';
-                    else
-                        return 'white';
+                .style('fill', d => d.state == 'loading' ? 'url(#loader)' : null)
+                .attr('width', (d, i)=> textWidths[i])
+                .attr("transform", (d, i) => {
+                    return `translate(${-textWidths[i] / 2}, ${-RECT_SIZE.height / 2})`;
                 });
 
             // Transition nodes to their new position.
             var nodeUpdate = node
                 .transition()
                 .duration(duration)
-                .attr("transform", d => {
-                    return "translate(" + d.x + "," + d.y + ")";
-                });
+                .attr("transform", d => `translate(${d.x}, ${d.y})`);
 
             //Hide text while doing so
             nodeUpdate
@@ -325,9 +340,7 @@ const vm = new Vue({
                 .exit()
                 .transition()
                 .duration(duration)
-                .attr("transform", d => {
-                    return "translate(" + source.x + "," + source.y + ")";
-                })
+                .attr("transform", d => `translate(${source.x}, ${source.y})`)
                 .remove();
 
             //Hide the text if we're about to delete a node
@@ -351,9 +364,9 @@ const vm = new Vue({
             this.render(node);
 
             //Request the data
-            d3.json(
-                `/api/markov?node=${node.dbId}&order=${this.settings.orderBy}&num=${this.settings.numNodes}`,
-                (error, json) => {
+            d3
+                .json(`/api/markov?node=${node.dbId}&order=${this.settings.orderBy}&num=${this.settings.numNodes}`)
+                .get((error, json) => {
 
                     //Process the data
                     let totalWeight = 0;
@@ -367,6 +380,7 @@ const vm = new Vue({
                     node.totalWeight = totalWeight;
                     node.state = 'open';
                     node.children = json;
+                    node.isLeaf = json.length == 0;
 
                     //Rerender
                     this.render(node);

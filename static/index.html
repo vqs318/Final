@@ -121,10 +121,8 @@
                 the 15 that are present are all from the top 100 most commented subredits.
             </li>
             <li><b>Choose display options.</b> These include the number of child nodes to display, and how to select
-                those nodes. Note
-                that selecting random nodes will take a long time for the &lt;Start&gt; node as the database often
-                has to sort
-                many thousands of comments. After this first node, nodes should load much faster.
+                those nodes. These settings apply only to newly opened nodes, not existing nodes. If you want to change
+                the settings for an existing node, you'll have to press Reset and open the tree again.
             </li>
             <li><b>Click &lt;Start&gt;</b> to open the start node and display which words are likely to occur next
                 (assuming Order By is set to 'largest')
@@ -141,7 +139,7 @@
         </ul>
 
     </div>
-    <div class="col-md-12">
+    <div id class="col-md-12">
         <div class="form-group">
             <label>Subreddit</label>
             <select v-model="currentSubreddit" class="form-control">
